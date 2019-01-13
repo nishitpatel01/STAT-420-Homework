@@ -1,4 +1,7 @@
 
+# HomeWork 1
+## Nishit K Patel, May - 2017
+
 -   [Exercise 1](#exercise-1)
 -   [Exercise 2](#exercise-2)
 -   [Exercise 3](#exercise-3)
