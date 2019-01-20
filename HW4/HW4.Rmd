@@ -1,0 +1,506 @@
+---
+title: "Week 4 - Homework"
+author: "STAT 420, Summer 2017, Nishit Patel"
+date: ''
+output:
+   md_document:
+    variant: markdown_github
+    toc: yes
+---
+
+## Exercise 1 (Using `lm`)
+
+For this exercise we will use the data stored in [`nutrition.csv`](nutrition.csv). It contains the nutritional values per serving size for a large variety of foods as calculated by the USDA. It is a cleaned version totaling 5,138 observations and is current as of September 2015.
+
+The variables in the dataset are:
+
+- `ID` 
+- `Desc` - Short description of food
+- `Water` - in grams
+- `Calories` 
+- `Protein` - in grams
+- `Fat` - in grams
+- `Carbs` - Carbohydrates, in grams
+- `Fiber` - in grams
+- `Sugar` - in grams
+- `Calcium` - in milligrams
+- `Potassium` - in milligrams
+- `Sodium` - in milligrams
+- `VitaminC` - Vitamin C, in milligrams
+- `Chol` - Cholesterol, in milligrams
+- `Portion` - Description of standard serving size used in analysis
+
+**(a)** Fit the following multiple linear regression model in `R`. Use `Calories` as the response and `Carbs`, `Fat`, and `Protein` as predictors.
+
+\[
+Y_i = \beta_0 + \beta_1 x_{i1} + \beta_2 x_{i2} + \beta_3 x_{i3} + \epsilon_i.
+\]
+
+Here,
+
+- $Y_i$ is `Calories`.
+- $x_{i1}$ is `Carbs`.
+- $x_{i2}$ is `Fat`.
+- $x_{i3}$ is `Protein`.
+
+```{r, message=FALSE, warning=FALSE}
+library(readr)
+nutrition <- read_csv("nutrition.csv")
+nutrition_model <- lm(Calories~ Carbs + Fat + Protein, data = nutrition)
+```
+
+
+Use an $F$-test to test the significance of the regression. Report the following:
+ 
+- The null and alternative hypotheses
+- The value of the test statistic
+- The p-value of the test
+- A statistical decision at $\alpha = 0.01$
+- A conclusion in the context of the problem
+
+When reporting these, you should explicitly state them in your document, not assume that a reader will find and interpret them from a large block of `R` output.
+
+- For the null hypothesis, we will consider the model where none of the predictor have a significant relationship with response. On the contrary the alternative hypothesis would be that atleast one of the predictors from null hypothesis is not 0, i.e. atleast one of the predictor has significant relationship with response. we can write these model as:
+
+    + null model - $H_0: \beta_1 = \beta_2 = \beta_3 = ......\beta_(p-1) = 0$ or $Y_i = \beta_0 + \epsilon_i$.
+    + full model - $H_1: \beta_j \neq 0, j = 1,2,....(p-1)$ or $Y_i = \beta_0 + \beta_1 x_{i1} + \beta_2 x_{i2} + \beta_3 x_{i3} + \epsilon_i$.
+
+```{r, message=FALSE, warning=FALSE}
+null_nutrition_model <- lm(Calories ~ 1, data = nutrition)
+full_nutrition_model <- lm(Calories ~ Carbs + Fat + Protein, data = nutrition)
+anova(null_nutrition_model, full_nutrition_model)
+anova(null_nutrition_model, full_nutrition_model)[2,5]  #test statistic value
+anova(null_nutrition_model, full_nutrition_model)[2,6]  # p-value
+```
+
+- The value of test statistics is `r anova(null_nutrition_model, full_nutrition_model)[2,5]`.
+- p-value of the test is `r anova(null_nutrition_model, full_nutrition_model)[2,6]`.
+- As we can see from p-value which is extremely low, we would reject the null hypothesis at the alpha value of 0.01 and say that there is a significant linear relationship between response and atleast one predictor.
+- Atleast one of the predictors (`Carbs`, `Fat` and `Protein`) included in the model have significant relationship with the response variable (`Calorie`).
+
+**(b)** Output only the estimated regression coefficients. Interpret all $\hat{\beta}_j$ coefficients in the context of the problem.
+```{r, message=FALSE, warning=FALSE}
+summary(nutrition_model)$coefficients[,1]
+```
+ - Above are the estimated coefficients of the model that we fit. we interpret this model in this manner. For a particular value `Fat` and `Protein`, as `Carbs` intake increases, `Calories` increases by `r summary(nutrition_model)$coefficients[2,1]`. Similarly for a particular value of `Carbs` and `Protein`, as `Fat` intake increases, `Calories` increases by `r  summary(nutrition_model)$coefficients[3,1]`. and lastly for a particular values of `Carbs` and `Fat`, as `Protein` intake increases, Calories increases by `r summary(nutrition_model)$coefficients[4,1]`
+
+**(c)** Use your model to predict the number of `Calories` in a Big Mac. According to [McDonald's publicized nutrition facts](http://nutrition.mcdonalds.com/getnutrition/nutritionfacts.pdf), the Big Mac contains 47g of carbohydrates, 28g of fat, and 25g of protein.
+```{r, message=FALSE, warning=FALSE}
+new_nutrition <- data.frame(Carbs = 47, Fat = 28, Protein = 25)
+predict(nutrition_model, newdata = new_nutrition)
+```
+
+- The number of `calories` in a Big Mac would be `r predict(nutrition_model, newdata = new_nutrition)`.
+
+**(d)** Calculate the standard deviation, $s_y$, for the observed values in the Calories variable. Report the value of $s_e$ from your multiple regression model. Interpret both estimates in the context of this problem.
+```{r, message=FALSE, warning=FALSE}
+sd(nutrition$Calories)
+summary(nutrition_model)$sigma
+```
+
+- standard deviation of $s_y$ is `r sd(nutrition$Calories)`.
+- $s_e$ value of the model is `r summary(nutrition_model)$sigma`. It means that considering `Carbs`, `Fat` and `Protein` in the model, the actual value of `Calories` deviates by `r summary(nutrition_model)$sigma` from the mean `Calories` value.
+
+**(e)** Report the value of $R^2$ for the model. Interpret its meaning in the context of the problem.
+```{r, message=FALSE, warning=FALSE}
+summary(nutrition_model)$r.squared
+```
+
+- The $R^2$ value of the model is `r summary(nutrition_model)$r.squared` which means that our model is explaining `r summary(nutrition_model)$r.squared` amount of variability about response i.e. this model is explaining `r summary(nutrition_model)$r.squared` amount of variability considering all the predictors.
+
+**(f)** Calculate a 90% confidence interval for $\beta_2$. Give an interpretation of the interval in the context of the problem.
+```{r, message=FALSE, warning=FALSE}
+confint(nutrition_model, level = 0.90 )[3,]
+```
+
+- Here we say that we are 90% confident that for a particular value of `Carbs` and `Protein`, the mean value of `Fat` would be between `r confint(nutrition_model, level = 0.90 )[3,1]` grams and `r confint(nutrition_model, level = 0.90 )[3,2]` grams.
+
+**(g)** Calculate a 95% confidence interval for $\beta_0$. Give an interpretation of the interval in the context of the problem.
+```{r}
+confint(nutrition_model, level = 0.90 )[1,]
+```
+
+- The above interval suggests that for a `Carbs`, `Fat` and `Protein` value of 0 grams, we are 90% confident that `Calories` content would be between `r confint(nutrition_model, level = 0.90 )[1,]` and `r confint(nutrition_model, level = 0.90 )[1,]`.
+
+**(h)** Use a 99% confidence interval to estimate the mean `Calorie` content of a small order of McDonald's french fries that has 30g of `carbohydrates`, 11g of `fat`, and 2g of `protein`. Interpret the interval in context.
+```{r, message=FALSE, warning=FALSE}
+new_nutrition_fries <- data.frame(Carbs = 30, Fat = 11, Protein = 2)
+predict(nutrition_model, newdata = new_nutrition_fries, interval = "confidence", level = 0.99)
+```
+
+- For a french fried with content suggested above, the mean expected `Calorie` content would be `r predict(nutrition_model, newdata = new_nutrition_fries, interval = "confidence", level = 0.99)[,1]` and we are 90% confident that the mean expected `Calorie` would be between .`r predict(nutrition_model, newdata = new_nutrition_fries, interval = "confidence", level = 0.99)[,2]` and `r predict(nutrition_model, newdata = new_nutrition_fries, interval = "confidence", level = 0.99)[,3]`.
+ 
+**(i)** Use a 90% prediction interval to predict the Calorie content of new healthy menu item that has 11g of carbohydrates, 1.5g of fat, and 1g of protein. Interpret the interval in context.
+```{r, message=FALSE, warning=FALSE}
+new_nutrition_healthyMenu <- data.frame(Carbs = 11, Fat = 1.5, Protein = 1)
+predict(nutrition_model, newdata = new_nutrition_healthyMenu, interval = "prediction", level = 0.90)
+```
+- Using the prediction interval, the predicted Calorie content would be `r predict(nutrition_model, newdata = new_nutrition_healthyMenu, interval = "prediction", level = 0.90)[1,1]` and the would fall between `r predict(nutrition_model, newdata = new_nutrition_healthyMenu, interval = "prediction", level = 0.90)[,2]` and `r predict(nutrition_model, newdata = new_nutrition_healthyMenu, interval = "prediction", level = 0.90)[,3]` 90% of the time.
+
+## Exercise 2 (More `lm`)
+
+For this exercise we will use the data stored in [`goalies_cleaned.csv`](goalies_cleaned.csv). It contains career data for 462 players in the National Hockey League who played goaltender at some point up to and including the 2014-2015 season. The variables in the dataset are:
+ 
+- `W` - Wins
+- `GA` - Goals Against
+- `SA` - Shots Against
+- `SV` - Saves
+- `SV_PCT` - Save Percentage
+- `GAA` - Goals Against Average
+- `SO` - Shutouts
+- `MIN` - Minutes
+- `PIM` - Penalties in Minutes
+
+For this exercise we will consider three models, each with Wins as the response. The predictors for these models are:
+
+- Model 1: Goals Against, Shots Against, Saves
+- Model 2: Goals Against, Shots Against, Saves, Minutes, Penalties in Minutes
+- Model 3: All Available
+
+**(a)** Use an $F$-test to compares models 1 and 2. Report the following:
+
+- The null hypothesis
+- The value of the test statistic
+- The p-value of the test
+- A statistical decision at $\alpha = 0.01$
+- The model you prefer
+```{r message=FALSE, warning=FALSE}
+library(readr)
+goalies_cleaned <- read_csv("goalies_cleaned.csv")
+model_1 <- lm(W ~ GA + SA + SV, data = goalies_cleaned)
+model_2 <- lm(W ~ GA + SA + SV + MIN + PIM, data = goalies_cleaned)
+model_3 <- lm(W ~ ., data = goalies_cleaned)
+anova(model_1,model_2)
+
+anova(model_1, model_2)[2,5]  #test statistic value
+anova(model_1, model_2)[2,6]  #p-value
+```
+
+- Here we can see that model_1 is subset of model_2. i.e. model_1(null model) contains subset of predictors from model_2 (full model) and no additional predictors. both model have $\beta_0$ as well as coefficient. we would write null model as below:
+
+\[
+H_0:  \beta_{MIN} = \beta_{PIM} = 0
+\]
+\[
+H_1:  \beta_j \neq 0\  (at\ atleast\ one\ \beta_0\ is\ not\ 0 )
+\]
+
+- value of test statistic is `r anova(model_1, model_2)[2,5]`.
+- p-value of the test is `r anova(model_1, model_2)[2,6]`.
+- since p-value of the model is extremely low, we would reject the null hypothesis at $\alpha = 0.01$.
+- we would prefer model_2 which says that atleast `Minutes` or `Penalties in Minutes` is a significant predictor with `Goal Against`, `Shots Against` and `Saves` in the model.
+
+**(b)** Use an $F$-test to compare model 3 to your preferred model from part **(a)**. Report the following:
+
+- The null hypothesis
+- The value of the test statistic
+- The p-value of the test
+- A statistical decision at $\alpha = 0.01$
+- The model you prefer
+```{r, message=FALSE, warning=FALSE}
+anova(model_2, model_3)
+anova(model_2, model_3)[2,5]  #test statistic value
+anova(model_2, model_3)[2,6]  #p-value
+```
+- Here we can see that model_2 is subset of model_3. i.e. model_2(null model) contains subset of predictors from model_3 (full model) and no additional predictors. both model have $\beta_0$ as well as coefficient. we would write null model as below:
+
+\[
+H_0:  \beta_{SVPCT} = \beta_{GAA} = \beta_{SO} = 0
+\]
+
+- Alternative hypothesis would be at least one of the $\beta_j$ from null model is not 0.
+- value of test statistic is `r anova(model_2, model_3)[2,5]`.
+- p-value of the test is `r anova(model_2, model_3)[2,6]`.
+- since p-value of the model is large and F statistics is `r anova(model_2, model_3)[2,5]`, we fail to reject the null hypothesis at $\alpha = 0.01$.
+- we would prefer model_2 because from the significance test above we saw that `Save Percentage`, `Goals Aginast Average` and `Shutouts` are not significant predictors given predictors `Goal Against`, `Shots Against`, `Saves`, `Minutes` and `Penalties in Minutes` already in the model.
+
+**(c)** Use a $t$-test to test $H_0: \beta_{\text{SA}} = 0 \ \text{vs} \ H_1: \beta_{\text{SA}} \neq 0$ for the model you preferred in part **(b)**. Report the following:
+
+- The value of the test statistic
+- The p-value of the test
+- A statistical decision at $\alpha = 0.01$
+```{r, message=FALSE, warning=FALSE}
+summary(model_2)
+summary(model_2)$coef[3,3]  #test statistic value
+summary(model_2)$coef[3,4]  #p-value
+```
+- The test statistics value is `r summary(model_2)$coef[3,3]`
+- p-value is `r summary(model_2)$coef[3,4]`.
+- In this case for the $\alpha = 0.01$ we would reject the null hypothesis i.e. predictor `Shots Against` is a significant predictor considering `Goal Aginast`, `Saves`, `Minutes` and `Penalties in Minutes` are already in the model.
+  
+## Exercise 3 (Regression without `lm`)
+
+For this exercise we will once again use the data stored in [`goalies_cleaned.csv`](goalies_cleaned.csv). The goal of this exercise is to fit a model with `W` as the response and the remaining variables as predictors.
+
+**(a)** Obtain the estimated regression coefficients **without** the use of `lm()` or any other built-in functions for regression. That is, you should use only matrix operations. Store the results in a vector `beta_hat_no_lm`. To ensure this is a vector, you may need to use `as.vector()`. Return this vector as well as the results of `sum(beta_hat_no_lm)`.
+```{r, message=FALSE, warning=FALSE}
+library(readr)
+goalies_cleaned <- read_csv("goalies_cleaned.csv")
+
+n <- nrow(goalies_cleaned)
+X <- cbind(rep(1,n),goalies_cleaned$GA,goalies_cleaned$SA,goalies_cleaned$SV,goalies_cleaned$SV_PCT,goalies_cleaned$GAA,goalies_cleaned$SO,goalies_cleaned$MIN,goalies_cleaned$PIM)
+y <- goalies_cleaned$W
+
+beta_hat_no_lm <- solve(t(X) %*% X) %*% t(X) %*% y
+beta_hat_no_lm <- as.vector(beta_hat_no_lm)
+
+beta_hat_no_lm
+sum(beta_hat_no_lm)
+
+```
+
+
+**(b)** Obtain the estimated regression coefficients **with** the use of `lm()`. Store the results in a vector `beta_hat_lm`. To ensure this is a vector, you may need to use `as.vector()`. Return this vector as well as the results of `sum(beta_hat_lm)`.
+```{r, message=FALSE, warning=FALSE}
+model <- lm(W~., data = goalies_cleaned)
+
+beta_hat_lm <- as.vector(coef(model))
+beta_hat_lm
+sum(beta_hat_lm)
+```
+
+
+**(c)** Use the `all.equal()` function to verify that the results are the same. You may need to remove the names of one of the vectors. The `as.vector()` function will do this as a side effect, or you can directly use `unname()`.
+```{r, message=FALSE, warning=FALSE}
+all.equal(beta_hat_no_lm,beta_hat_lm)
+```
+
+
+**(d)** Calculate $s_e$ without the use of `lm()`. That is, continue with your results from **(a)** and perform additional matrix operations to obtain the result. Output this result. Also, verify that this result is the same as the result obtained from `lm()`.
+```{r, message=FALSE, warning=FALSE}
+y_hat <- X %*% solve(t(X) %*% X) %*% t(X) %*% y
+e <- y - y_hat
+p <- ncol(goalies_cleaned)
+
+s_e_no_lm <- as.vector(sqrt(t(e) %*% e / (n - p)))
+s_e_lm <- as.vector(summary(model)$sigma)
+
+s_e_lm  #Se value using lm
+s_e_no_lm   #Se value without using lm
+
+all.equal(s_e_no_lm,s_e_lm)
+```
+
+
+**(e)** Calculate $R^2$ without the use of `lm()`. That is, continue with your results from **(a)** and **(d)**, and perform additional operations to obtain the result. Output this result. Also, verify that this result is the same as the result obtained from `lm()`.
+```{r, message=FALSE, warning=FALSE}
+SSReg <- sum((y_hat - mean(y))^2)
+SSTotal <- sum((y - mean(y))^2)
+
+r_square_no_lm <- as.vector(SSReg/SSTotal)
+r_square_lm <- summary(model)$r.squared
+
+r_square_no_lm  #r square value without using lm
+r_square_lm   #r square value using lm
+
+all.equal(r_square_no_lm ,r_square_lm)
+```
+
+
+## Exercise 4 (Regression for Prediction)
+
+For this exercise use the `Boston` dataset from the `MASS` package. Use `?Boston` to learn about the dataset. The goal of this exercise is to find a model that is useful for **predicting** the response `medv`.
+
+When evaluating a model for prediction, we often look at RMSE. However, if we both fit the model with all the data as well as evaluate RMSE using all the data, we're essentially cheating. We'd like to use RMSE as a measure of how well the model will predict on *unseen* data. If you haven't already noticed, the way we had been using RMSE resulted in RMSE decreasing as models became larger.
+
+To correct for this, we will only use a portion of the data to fit the model, and then we will use leftover data to evaluate the model. We will call these datasets **train** (for fitting) and **test** (for evaluating). The definition of RMSE will stay the same
+
+\[
+\text{RMSE}(\text{model, data}) = \sqrt{\frac{1}{n} \sum_{i = 1}^{n}(y_i - \hat{y}_i)^2}
+\]
+
+where
+
+- $y_i$ are the actual values of the response for the given data
+- $\hat{y}_i$ are the predicted values using the fitted model and the predictors from the data
+
+However, we will now evaluate it on both the **train** set and the **test** set separately. So each model you fit will have a **train** RMSE and a **test** RMSE. When calculating **test** RMSE, the predicted values will be found by predicting the response using the **test** data with the model fit using the **train** data. *__Test__ data should never be used to fit a model.*
+
+- Train RMSE: Model fit with train data. Evaluate on **train** data.
+- Test RMSE: Model fit with train data. Evaluate on **test** data.
+
+Set a seed of `42`, and then split the `Boston` data into two datasets, one called `train_data` and one called `test_data`. The `train_data` dataframe should contain 250 randomly chosen observations. `test_data` will contain the remaining observations. Hint: consider the following code:
+
+```{r, message=FALSE, warning=FALSE}
+library(MASS)
+set.seed(42)
+train_index = sample(1:nrow(Boston), 250)
+train_data <- Boston[train_index,]
+test_data <- Boston[-train_index,]
+```
+
+Fit a total of five models using the training data.
+
+- One must use all possible predictors.
+- One must use only `tax` as a predictor.
+- The remaining three you can pick to be anything you like. One of these should be the best of the five for predicting the response.
+
+```{r, message=FALSE, warning=FALSE}
+model_boston_full_train <- lm(medv ~ ., data = train_data)   #train full model
+model_boston_tax_train <- lm(medv ~ tax, data = train_data)  #train property tax model 
+model_1 <- lm(medv ~ rm + dis + ptratio + lstat + nox + black + tax + + zn + crim + rad, data = train_data)  
+model_2 <- lm(medv ~ rm + dis + ptratio + lstat + nox + black + tax + + zn + rad, data = train_data)  
+model_3 <- lm(medv ~ rm + dis + ptratio + lstat + nox, data = train_data)  
+
+#model RMSE with train data
+train_data_full_model_RMSE <- sqrt(sum(residuals(model_boston_full_train)^2) / length(residuals(model_boston_full_train)))
+train_data_tax_model_RMSE <- sqrt(sum(residuals(model_boston_tax_train)^2) / length(residuals(model_boston_tax_train)))
+train_model_1 <- sqrt(sum(residuals(model_1)^2) / length(residuals(model_1)))
+train_model_2 <- sqrt(sum(residuals(model_2)^2) / length(residuals(model_2)))
+train_model_3 <- sqrt(sum(residuals(model_3)^2) / length(residuals(model_3)))
+
+#model RMSE with test data
+test_data_full_model_RMSE <- sqrt(sum((test_data$medv - predict(model_boston_full_train, newdata=test_data))^2) / length(test_data$medv))
+test_data_tax_model_RMSE <- sqrt(sum((test_data$medv - predict(model_boston_tax_train, newdata=test_data))^2)/ length(test_data$medv))
+test_model_1 <- sqrt(sum((test_data$medv - predict(model_1, newdata=test_data))^2) / length(test_data$medv))
+test_model_2 <- sqrt(sum((test_data$medv - predict(model_2, newdata=test_data))^2) / length(test_data$medv))
+test_model_3 <- sqrt(sum((test_data$medv - predict(model_3, newdata=test_data))^2) / length(test_data$medv))
+
+```
+
+
+For each model report the **train** and **test** RMSE. Arrange your results in a well-formatted markdown table. Argue that one of your models is the best for predicting the response.
+```{r}
+library(knitr)
+
+RMSE_table <- data.frame(
+                          Model = c("Full","Tax","Model_1","Model_2","Model_3"),
+                          train_RMSE = c(
+                                          train_data_full_model_RMSE,
+                                          train_data_tax_model_RMSE,
+                                          train_model_1,
+                                          train_model_2,
+                                          train_model_3
+                                        ),
+                          test_RMSE = c(
+                                          test_data_full_model_RMSE,
+                                          test_data_tax_model_RMSE,
+                                          test_model_1,
+                                          test_model_2,
+                                          test_model_3
+                                       )
+                        )
+  
+kable(RMSE_table, caption = "Boston Models")
+```
+
+- we first splitted the data into training and test sets and fitted the model first with all predictors and then with predictor `tax` only. After fitting full model. we looked at the summaru and identified predictors with low p-value which are significant. This resulted in selection of `rm`, `dis`, `ptratio`,`lstat`, `nox`, `black`,`tax`, `zn`, `crim` and `rad`. After fitting the model with these predictors, we saw that the `train_RMSE` was slightly higher than full model but `test_RMSE` was lower than full model which tells us that this model is fitting better on test data compare to full model. we subsequently performed the same process and by looking into summary from these models and by eliminatating non-significant predictors (by using higher p-value) we arrived at 3 addition model and comparted all five models.
+- By comparing all five models it appears that model_1 is a better fit (based on `test_RMSE`) compare to rest of the models. This model contains predictors `rm`, `dis`, `ptratio`,`lstat`, `nox`, `black`,`tax`, `zn`, `crim` and `rad`. This modle has lowest `test_RMSE` value of `5.065440`. Hence we select this model for predicting the response.
+
+## Exercise 5 (Simulating Multiple Regression)
+
+For this exercise we will simulate data from the following model:
+
+\[
+Y_i = \beta_0 + \beta_1 x_{i1} + \beta_2 x_{i2} + \beta_3 x_{i3} + \beta_4 x_{i4} + \epsilon_i
+\]
+
+Where $\epsilon_i \sim N(0, \sigma^2).$ Also, the parameters are known to be:
+
+- $\beta_0 = 1$
+- $\beta_1 = 2.5$
+- $\beta_2 = 0$
+- $\beta_3 = 4$
+- $\beta_4 = 1$
+- $\sigma^2 = 16$
+
+We will use samples of size `n = 20`.
+
+We will verify the distribution of $\hat{\beta}_1$ as well as investigate some hypothesis tests.
+
+**(a)** We will first generate the $X$ matrix and data frame that will be used throughout the exercise. Create the following 9 variables:
+
+- `x0`: a vector of length `n` that contains all `1`
+- `x1`: a vector of length `n` that is randomly drawn from a uniform distribution between `0` and `5`
+- `x2`: a vector of length `n` that is randomly drawn from a uniform distribution between `0` and `10`
+- `x3`: a vector of length `n` that is randomly drawn from a normal distribution with a mean of `0` and a standard deviation of `1`
+- `x4`: a vector of length `n` that is randomly drawn from a normal distribution with a mean of `0` and a standard deviation of `2`
+- `X`: a matrix that contains `x0`, `x1`, `x2`, `x3`, `x4` as its columns
+- `C`: the $C$ matrix that is defined as $(X^\top X)^{-1}$
+- `y`: a vector of length `n` that contains all `0`
+- `sim_data`: a data frame that stores `y` and the **four** predictor variables. `y` is currently a placeholder that we will update during the simulation
+
+Report the diagonal of `C` as well as the 10th row of `sim_data`. For this exercise we will use the seed `1337`. Generate the above variables in the order listed after running the code below to set a seed.
+
+```{r}
+set.seed(1337)
+sample_size <- 20
+
+beta_0 <- 1
+beta_1 <- 2.5
+beta_2 <- 0
+beta_3 <- 4
+beta_4 <- 1
+sigma <- 4
+
+x0 <- rep(1,sample_size)
+x1 <- runif(sample_size,0,5)
+x2 <- runif(sample_size,0,10)
+x3 <- rnorm(sample_size,0,1)
+x4 <- rnorm(sample_size,0,2)
+X <- cbind(x0,x1,x2,x3,x4)
+C <- solve(t(X) %*% X)
+y <- rep(0,sample_size)
+sim_data <- data.frame(y,x1,x2,x3,x4)
+
+diag(X)
+sim_data[10,]
+
+```
+
+**(b)** Create three vectors of length `2000` that will store results from the simulation in part **(c)**. Call them `beta_hat_1`, `beta_2_pval`, and `beta_3_pval`.
+```{r}
+beta_hat_1 <- rep(0,2000)
+beta_2_pval <- rep(0,2000)
+beta_3_pval <- rep(0,2000)
+```
+
+
+**(c)** Simulate 2000 samples of size `n = 20` from the model above. Each time update the `y` value of `sim_data`. Then use `lm()` to fit a multiple regression model. Each time store:
+
+- The value of $\hat{\beta}_1$ in `beta_hat_1`
+- The p-value for the two-sided test of $\beta_2 = 0$ in `beta_2_pval`
+- The p-value for the two-sided test of $\beta_3 = 0$ in `beta_3_pval`
+```{r}
+ for(i in 1:2000) {
+  eps <- rnorm(sample_size,mean=0,sd=sigma)
+  sim_data$y <- beta_0 * x0 + beta_1 * x1 + beta_2 * x2 + beta_3 * x3 + beta_4 * x4 + eps
+  model <- lm(y ~ x1 + x2 + x3 + x4, data = sim_data)
+  beta_hat_1[i] <- coef(model)[2]
+  beta_2_pval[i] <- summary(model)$coefficients[3,4]
+  beta_3_pval[i] <- summary(model)$coefficients[4,4]
+ } 
+```
+
+
+**(d)** Based on the known values of $X$, what is the true distribution of $\hat{\beta}_1$?
+```{r}
+hist(beta_hat_1,breaks =20)
+```
+
+- Based on histogram the true distribution of $\hat{\beta}_1$ follows normal distribution with mean of `r beta_1` and variance of `r var(beta_hat_1)`.
+
+**(e)** Calculate the mean and variance of `beta_hat_1`. Are they close to what we would expect? Plot a histogram of `beta_hat_1`. Add a curve for the true distribution of $\hat{\beta}_1$. Does the curve seem to match the histogram?
+```{r}
+mean(beta_hat_1)
+var(beta_hat_1)
+hist( beta_hat_1, prob = TRUE, breaks =20, xlab = expression(hat(beta)[1]),   main = "Histogram of beta_hat_1", border = "dodgerblue")
+curve(dnorm(x, mean = beta_1,sd = sqrt(sigma ^ 2 * C[1+1,1+1])), col = "darkorange", add = TRUE, lwd = 3)
+```
+
+- The mean of `beta_hat_1` is `r mean(beta_hat_1)` which is very close to true beta_1 value of `r beta_1` (what we would expect) and variance is `r var(beta_hat_1)`. also variance of `beta_hat_1` is `r var(beta_hat_1)` which is very close to true variance of `beta_1` value of `r sigma ^ 2 * C[1 + 1, 1 + 1]`.
+
+**(f)** What proportion of the p-values stored in `beta_3_pval` are less than 0.05? Is this what you would expect?
+```{r}
+proportion_1 <- sum(beta_3_pval < 0.05)
+proportion_1 / length(beta_3_pval)
+```
+- `r proportion_1 / length(beta_3_pval)` proportion of `beta_3_pval` values are less than 0.05 which is what would expect. 
+
+**(g)** What proportion of the p-values stored in `beta_2_pval` are less than 0.05? Is this what you would expect?
+```{r}
+proportion_2 <- sum(beta_2_pval < 0.05)
+proportion_2 / length(beta_2_pval)
+```
+- `r proportion_2 / length(beta_2_pval)` proportion of the values are less than 0.05 which is not expected.
+
