@@ -1,0 +1,480 @@
+---
+title: "Week 9 - Homework"
+author: "STAT 420, Summer 2017, Nishit Patel"
+date: ''
+output:
+  html_document: 
+    toc: yes
+  pdf_document: default
+---
+
+```{r setup, echo = FALSE, message = FALSE, warning = FALSE}
+options(scipen = 1, digits = 4, width = 80)
+```
+
+## Exercise 1 (`longley` Macroeconomic Data)
+
+The built-in dataset `longley` contains macroeconomic data for predicting employment. We will attempt to model the `Employed` variable.
+
+```{r, eval = FALSE}
+View(longley)
+?longley
+```
+
+**(a)** What is the largest correlation between any pair of predictors in the dataset?
+```{r}
+round(cor(longley), 3)
+```
+ The largest correlation is between predictors `Year` and `GNP` which is `0.995`.
+
+**(b)** Fit a model with `Employed` as the response and the remaining variables as predictors. Calculate and report the variance inflation factor (VIF) for each of the predictors. Which variable has the largest VIF? Do any of the VIFs suggest multicollinearity?
+```{r}
+employed_model <- lm(Employed ~ ., data=longley)
+summary(employed_model)
+car::vif(employed_model)
+```
+  Almost All the predictors except `Armed.Forces` seems to have multicollinearity issue as all have very high variance inflation factor. Predictor `GNP` has largest vaiance inflation factor value of `1788.513`.
+
+**(c)** What proportion of the observed variation in `Population` is explained by a linear relationship with the other predictors?
+```{r}
+pop_model <- lm(Population ~ . - Employed, data=longley)
+summary(pop_model)$r.squared
+```
+`r summary(pop_model)$r.squared * 100`% of the observed variation in Population is explained by a linear relationship with the other predictors.
+
+**(d)** Calculate the partial correlation coefficient for `Population` and `Employed` **with the effects of the other predictors removed**.
+```{r}
+emp_model <- lm(Employed ~ . - Population, data = longley)
+cor(resid(pop_model), resid(emp_model))
+```
+ Partial corrleation coeffient is `r cor(resid(pop_model), resid(emp_model))`.
+
+**(e)** Fit a new model with `Employed` as the response and the predictors from the model in **(b)** that were significant. (Use $\alpha = 0.05$.) Calculate and report the variance inflation factor for each of the predictors. Which variable has the largest VIF? Do any of the VIFs suggest multicollinearity?
+```{r}
+employed_model2 <- lm(Employed ~  Unemployed + Armed.Forces + Year, data = longley)
+car::vif(employed_model2)
+```
+After fitting the model, We see that predictor `Year` has largest VIF. none of the predictors seems to have multicollinearity issues.
+
+**(f)** Use an $F$-test to compare the models in parts **(b)** and **(e)**. Report the following:
+
+- The null hypothesis
+- The test statistic
+- The distribution of the test statistic under the null hypothesis
+- The p-value
+- A decision
+- Which model you prefer, **(b)** or **(e)**
+```{r}
+anova(employed_model2, employed_model)
+```
+- null hypothesis would be coefficients of `GNP.deflator1`, `GNP` and `Population` are 0.
+  i.e. 
+     $H_0: \beta_5 = \beta_6 = \beta_7 = 0$
+- alternative hypothesis would be atleast one of the coefficients of `GNP.deflator1`, `GNP` and `Population` are not 0.
+  i.e. 
+     $H_1: at\ least\ one\ of\ the\ parameters\ \beta_5, \beta_6, \beta_7 \ne 0$
+    
+- the value of test statistic is `r anova(employed_model2, employed_model)$coefficient[2,5]`.
+- test statistics follows F-distribution with `12` and `9` degrees of freedom.
+- p-value is `r anova(employed_model2, employed_model)[2,6]`.
+- Considering the significance level of 0.05, we fail to reject null hypothesis.
+- We would prefer smaller or null model.
+
+**(g)** Check the assumptions of the model chosen in part **(f)**. Do any assumptions appear to be violated?
+
+```{r}
+plot_fitted_resid = function(model, pointcol = "dodgerblue", linecol = "darkorange") {
+  plot(fitted(model), resid(model), 
+       col = pointcol, pch = 20, cex = 1.5,
+       xlab = "Fitted", ylab = "Residuals")
+  abline(h = 0, col = linecol, lwd = 2)
+}
+
+plot_qq = function(model, pointcol = "dodgerblue", linecol = "darkorange") {
+  qqnorm(resid(model), col = pointcol, pch = 20, cex = 1.5)
+  qqline(resid(model), col = linecol, lwd = 2)
+}
+
+plot_fitted_resid(employed_model2)
+plot_qq(employed_model2)
+```
+
+- The model seems to have a contant variation but it appers to be violating the normality assumptions. When we look at the qq plot, we can see points being away from the line.
+
+
+## Exercise 2 (`Boston` Housing Data)
+
+**(a)** Use the `Boston` data found in the `MASS` package to find a "good" model for `medv`. Use any methods seen in class. The model should reach a LOOCV-RMSE below `3.25` and the Breusch-Pagan test should fail to reject at an $\alpha$ of $0.01$. Do not use any transformations of the response variable.
+
+```{r, fig.height=15, fig.width=20, message=FALSE, warning=FALSE}
+library(MASS)
+pairs(Boston, col="dodgerblue")
+```
+
+ - By looking at pairs graphs, we can see that there is a possibility of using polynomial transformation for some of the predictors, we will start the model with all 2 way interation terms and 3 degree polynomials for predictors `crim`, `indus`, `nox` and `lstat` as these predictors seems to have polynomial relationship with response variable.
+
+```{r, message=FALSE, warning=FALSE}
+library(leaps)
+#Adding polynomials
+boston_model_poly <- lm(medv ~ . ^ 2 + I(crim) ^ 3 + I(indus) ^ 3 + I(nox) ^ 3 + I(lstat) ^ 3 + I(black) ^ 3, data=Boston)
+
+# Backward AIC
+boston_model_back_aic <- step(boston_model_poly, direction = "backward", trace = 0)
+boston_model_back_aic
+
+# Backward BIC
+n <- length(resid(boston_model_poly))
+boston_model_back_bic <- step(boston_model_poly, direction = "backward", k=log(n), trace = 0)
+boston_model_back_bic
+
+#exhaustive search
+#exhaustive search 
+all_boston_mod <- summary(regsubsets(medv ~ ., data = Boston))
+
+(best_r2_ind = which.max(all_boston_mod$rss))
+all_boston_mod$which[best_r2_ind, ]
+
+```
+
+After looking at the model selected by `AIC` and `BIC`, we see that `BIC` has selected a smaller model with relatively smaller coefficient value. So will attempt to fit the model seleted by `BIC`.
+
+Store your model in a variable called `good_model`. Run the two given chunks to verify your model meets the requested criteria. If you cannot find a model that meets both criteria, partial credit will be given for meeting at least one of the criteria.
+
+```{r, message=FALSE, warning=FALSE}
+library(lmtest)
+good_model <- lm(medv ~ crim + zn + indus + chas + nox + rm + age + 
+    dis + rad + tax + ptratio + black + lstat + crim:chas + crim:rm +
+    crim:rad + crim:black + crim:lstat + zn:tax + zn:lstat +
+    indus:nox + indus:rm + chas:nox + chas:rm + chas:black +
+    chas:lstat + nox:age + nox:ptratio + rm:age + rm:tax + rm:ptratio +
+    rm:lstat + age:dis + age:rad + age:black + age:lstat + dis:tax +
+    tax:ptratio + tax:lstat, data = Boston)
+
+coef(good_model)
+```
+
+```{r, message = FALSE, warning = FALSE}
+library(lmtest)
+
+get_bp_decision = function(model, alpha) {
+  decide = unname(bptest(model)$p.value < alpha)
+  ifelse(decide, "Reject", "Fail to Reject")
+}
+
+get_loocv_rmse = function(model) {
+  sqrt(mean((resid(model) / (1 - hatvalues(model))) ^ 2))
+}
+```
+
+
+```{r}
+get_bp_decision(good_model, alpha = 0.01)
+get_loocv_rmse(good_model)
+```
+
+When we used `AIC` and `BIC` methods on our dataset, we see that `AIC` selects little large model compare to `BIC` and has lower p-value compare to model selected using `BIC` method. In above code we have selected the best model chosen with `BIC` method which results in LOOCV RMSE value of  `r get_loocv_rmse(good_model)`. 
+
+
+## Exercise 3 (Ball Bearings)
+
+For this exercise we will use the data stored in [`ballbearings.csv`](ballbearings.csv). It contains 210 observations, each of which reports the results of a test on a set of ball bearings. Manufacturers who use bearings in their products have an interest in their reliability. The basic measure of reliability in this context is the rating life, also known in engineering as fatigue failure. The objective is to model `L50`, the median lifetime of this sample of ball bearings. The variables in the dataset are:
+
+- `L50` - median life: the number of revolutions that 50% of a group of identical bearings would be expected to achieve
+- `P` - the load on the bearing in operation
+- `Z` - the number of balls in the bearing
+- `D` - the diameter of the balls
+- `Company` - denotes who manufactured the ball bearing (A, B, C)
+- `Type` - Company B makes several types of ball bearings (1, 2, 3); 0 otherwise
+
+
+**(a)** Find a model for `log(L50)` that does not reject the Shapiro-Wilk test at $\alpha = 0.01$ and obtains an **adjusted** $R^2$ higher than 0.52. You may not remove any observations, but may consider transformations. Your model should use fewer than 10 $\beta$ parameters.
+
+```{r, fig.height=15, fig.width=20, message=FALSE, warning=FALSE}
+library(readr)
+ballbearings <- read_csv("ballbearings.csv")
+ballbearings$Company <- as.factor(ballbearings$Company)
+ballbearings$Type <- as.factor(ballbearings$Type)
+pairs(ballbearings,col="dodgerblue")
+```
+
+looking at the pairs plot, it appears that we could use log transformation for response and predictor variables. we will be starting with the model an additive model and then will apply exhaustive search to identify right size and parameters of the model.
+
+```{r, message=FALSE, warning=FALSE}
+library(leaps)
+ballbearing_model <- lm(L50 ~ ., data=ballbearings)
+
+plot(fitted(ballbearing_model), resid(ballbearing_model), col = "grey", pch = 20,
+     xlab = "Fitted", ylab = "Residuals", main = "Fitted versus Residuals")
+abline(h = 0, col = "darkorange", lwd = 2)
+
+boxcox(ballbearing_model, plotit = TRUE)
+
+ballbearing_log_model <- lm(log(L50) ~ ., data=ballbearings)
+
+plot(fitted(ballbearing_log_model), resid(ballbearing_log_model), col = "grey", pch = 20,
+     xlab = "Fitted", ylab = "Residuals", main = "Fitted versus Residuals")
+abline(h = 0, col = "darkorange", lwd = 2)
+
+#exhaustive search 
+all_ball_mod = summary(regsubsets(L50 ~ ., data = ballbearings))
+
+(best_r2_ind = which.max(all_ball_mod$adjr2))
+all_ball_mod$which[best_r2_ind, ]
+
+#AIC
+(ball_model_back_aic <- step(ballbearing_log_model, direction = "backward", trace = 0))
+#BIC
+n <- length(resid(ballbearing_model))
+(ball_model_back_bic <- step(ballbearing_log_model, direction = "backward", trace = 0))
+```
+
+ we started with additive model and saw that it violates the constant variation assumption so to fix it, we ran boxcox method on the model to get appropriate value of $\lambda$. The method suggested to use log transformation of response variable. After fitting with model with log transformed response we see that fitted vs residuals plot seems to be better now. We then proceed with variable selection procedure.
+ 
+ from the exahautvie search we found that model with the size of 4 $\beta$ parameters, but when we take a look at model selected by `AIC` and `BIC` methods, it only select model with 3 parameters. So will now use log transformation for continuous predictors.
+
+Store your model in a variable called `good_model_a`. Run the two given chunks to verify your model meets the requested criteria. If you cannot find a model that meets all criteria, partial credit will be given for meeting at least some of the criteria.
+
+```{r}
+good_model_a <- lm(log(L50) ~ I(Company)^2 + I(Type)^2 + log(Z) + log(P) + log(D), data=ballbearings)
+summary(good_model_a)
+```
+
+```{r}
+get_sw_decision = function(model, alpha) {
+  decide = unname(shapiro.test(resid(model))$p.value < alpha)
+  ifelse(decide, "Reject", "Fail to Reject")
+}
+
+get_num_params = function(model) {
+  length(coef(model))
+}
+
+get_adj_r2 = function(model) {
+  summary(model)$adj.r.squared
+}
+```
+
+```{r}
+get_sw_decision(good_model_a, alpha = 0.01)
+get_num_params(good_model_a)
+get_adj_r2(good_model_a)
+```
+
+**(b)** Find a model for `log(L50)` that does not reject the Shapiro-Wilk test at $\alpha = 0.01$ and obtains an **adjusted** $R^2$ higher than 0.60. You may not remove any observations, but may consider transformations. Your model should use fewer than 20 $\beta$ parameters.
+
+Store your model in a variable called `good_model_b`. Run the given chunk to verify your model meets the requested criteria. If you cannot find a model that meets all criteria, partial credit will be given for meeting at least some of the criteria.
+
+```{r}
+good_model_b <- lm(log(L50) ~ Company:Type:D + log(P) + log(D), data=ballbearings)
+```
+
+
+```{r}
+get_sw_decision(good_model_b, alpha = 0.01)
+get_num_params(good_model_b)
+get_adj_r2(good_model_b)
+```
+
+## Exercise 4 (Does It Work?)
+
+In this exercise, we will investigate how well backwards AIC and BIC actually perform. For either to be "working" correctly, they should result in a low number of both **false positives** and **false negatives**. In model selection,
+
+- **False Positive**, FP: Incorrectly including a variable in the model. Including a *non-significant* variable
+- **False Negative**, FN: Incorrectly excluding a variable in the model. Excluding a *significant* variable
+
+Consider the **true** model
+
+\[
+Y = \beta_0 + \beta_1 x_1 + \beta_2 x_2 + \beta_3 x_3 + \beta_4 x_4 + \beta_5 x_5 + \beta_6 x_6 + \beta_7 x_7 + \beta_8 x_8 + \beta_9 x_9 + \beta_{10} x_{10} + \epsilon
+\]
+
+where $\epsilon \sim N(0, \sigma^2 = 9)$. The true values of the $\beta$ parameters are given in the `R` code below.
+
+```{r}
+beta_0  <- 1
+beta_1  <- 0
+beta_2  <- 1
+beta_3  <- 0
+beta_4  <- 2
+beta_5  <- 0
+beta_6  <- 1
+beta_7  <- 0
+beta_8  <- 2
+beta_9  <- 0
+beta_10 <- 1
+sigma <- 3
+```
+
+Then, as we have specified them, some variables are significant, and some are not. We store their names in `R` variables for use later.
+
+```{r}
+not_sig  <- c("x_1", "x_3", "x_5", "x_7", "x_9")
+signif <- c("x_2", "x_4", "x_6", "x_8", "x_10")
+```
+
+We now simulate values for these `x` variables, which we will use throughout part **(a)**.
+
+```{r}
+set.seed(42)
+n <- 100
+x_1  <- runif(n, 0, 10)
+x_2  <- runif(n, 0, 10)
+x_3  <- runif(n, 0, 10)
+x_4  <- runif(n, 0, 10)
+x_5  <- runif(n, 0, 10)
+x_6  <- runif(n, 0, 10)
+x_7  <- runif(n, 0, 10)
+x_8  <- runif(n, 0, 10)
+x_9  <- runif(n, 0, 10)
+x_10 <- runif(n, 0, 10)
+```
+
+We then combine these into a data frame and simulate `y` according to the true model.
+
+```{r}
+sim_data_1 <- data.frame(x_1, x_2, x_3, x_4, x_5, x_6, x_7, x_8, x_9, x_10,
+  y = beta_0 + beta_2 * x_2 + beta_4 * x_4 + beta_6 * x_6 + beta_8 * x_8 + 
+      beta_10 * x_10 + rnorm(n, 0 , sigma)
+)
+```
+
+We do a quick check to make sure everything looks correct.
+
+```{r}
+head(sim_data_1)
+```
+
+Now, we fit an incorrect model.
+
+```{r}
+fit <- lm(y ~ x_5 + x_6 + x_7, data = sim_data_1)
+coef(fit)
+```
+
+Notice, we have coefficients for `x_5`, `x_6`, and `x_7`. This means that `x_5` and `x_7` are false positives, while `x_2`, `x_4`, `x_8`, and `x_10` are false negatives.
+
+To detect the false negatives, use:
+
+```{r}
+# which are false negatives?
+!(signif %in% names(coef(fit)))
+```
+
+To detect the false positives, use:
+
+```{r}
+# which are false positives?
+names(coef(fit)) %in% not_sig
+```
+
+Note that in both cases, you could `sum()` the result to obtain the number of false negatives or positives.
+
+**(a)** Set a seed equal to your birthday; then, using the given data for each `x` variable above in `sim_data_1`, simulate the response variable `y` 200 times. Each time,
+
+- Fit an additive model using each of the `x` variables.
+- Perform variable selection using backwards AIC.
+- Perform variable selection using backwards BIC.
+- Calculate and store the number of false negatives for the models chosen by AIC and BIC.
+- Calculate and store the number of false positives for the models chosen by AIC and BIC.
+
+Calculate the rate of false positives and negatives for both AIC and BIC. Compare the rates between the two methods. Arrange your results in a well formatted table.
+
+```{r, message=FALSE, warning=FALSE}
+set.seed(19880918)
+num_sims <- 200
+sigma <- 3
+n <- 100
+
+ false_negative_aic_sim1 <- rep(0,num_sims)
+ false_negative_bic_sim1 <- rep(0,num_sims)
+ false_positive_aic_sim1 <- rep(0,num_sims)
+ false_positive_bic_sim1 <- rep(0,num_sims)
+
+
+for(i in 1:num_sims){
+  sim_data_1$y <- beta_0 +  beta_2 * x_2 + beta_4 * x_4 + beta_6 * x_6 + beta_8 * x_8 + beta_10 * x_10 + rnorm(n, 0, sigma)
+  model <- lm(y ~ ., data = sim_data_1)
+
+  len <- length(resid(model))
+  model_aic <- step(model, direction = "backward", trace = 0)
+  model_bic <- step(model, direction = "backward", k=log(len),trace = 0)
+
+  false_negative_aic_sim1[i] <- sum(!(signif %in% names(coef(model_aic))))
+  false_positive_aic_sim1[i] <- sum(names(coef(model_aic)) %in% not_sig)
+  false_negative_bic_sim1[i] <- sum(!(signif %in% names(coef(model_bic))))
+  false_positive_bic_sim1[i] <- sum(names(coef(model_bic)) %in% not_sig)
+}
+```
+
+```{r}
+library(knitr)
+method_table <- data.frame(
+                            Method = c("AIC","BIC"),
+                            False_Negative = c(sum(false_negative_aic_sim1)/200,sum(false_negative_bic_sim1)/200),
+                            False_Positive = c(sum(false_positive_aic_sim1)/200,sum(false_positive_bic_sim1)/200 )
+                          )
+
+kable(method_table,caption="Model Selection Table")
+```
+
+**(b)** Set a seed equal to your birthday; then, using the given data for each `x` variable below in `sim_data_2`, simulate the response variable `y` 200 times. Each time,
+
+- Fit an additive model using each of the `x` variables.
+- Perform variable selection using backwards AIC.
+- Perform variable selection using backwards BIC.
+- Calculate and store the number of false negatives for the models chosen by AIC and BIC.
+- Calculate and store the number of false positives for the models chosen by AIC and BIC.
+
+Calculate the rate of false positives and negatives for both AIC and BIC. Compare the rates between the two methods. Arrange your results in a well formatted table. Also compare to your answers in part **(a)** and suggest a reason for any differences.
+
+```{r, message=FALSE, warning=FALSE}
+set.seed(19880918)
+x_1  <- runif(n, 0, 10)
+x_2  <- runif(n, 0, 10)
+x_3  <- runif(n, 0, 10)
+x_4  <- runif(n, 0, 10)
+x_5  <- runif(n, 0, 10)
+x_6  <- runif(n, 0, 10)
+x_7  <- runif(n, 0, 10)
+x_8  <- x_6 + rnorm(n, 0, 0.1)
+x_9  <- x_6 + rnorm(n, 0, 0.1)
+x_10 <- x_4 + rnorm(n, 0, 0.1)
+
+sim_data_2 <- data.frame(x_1, x_2, x_3, x_4, x_5, x_6, x_7, x_8, x_9, x_10,
+  y = beta_0 + beta_2 * x_2 + beta_4 * x_4 + beta_6 * x_6 + beta_8 * x_8 + 
+      beta_10 * x_10 + rnorm(n, 0 , sigma)
+)
+
+num_sims <- 200
+false_negative_aic_sim2 <- rep(0,num_sims)
+false_negative_bic_sim2 <- rep(0,num_sims)
+false_positive_aic_sim2 <- rep(0,num_sims)
+false_positive_bic_sim2 <- rep(0,num_sims)
+
+for(i in 1:num_sims){
+    sim_data_2$y <- beta_0 + beta_2 * x_2 + beta_4 * x_4 + beta_6 * x_6 + beta_8 * x_8 + beta_10 * x_10 + rnorm(n, 0 , sigma)
+    model <- lm(y ~ ., data = sim_data_2)
+  
+  len <- length(resid(model))
+  model_aic <- step(model, direction = "backward", trace=0)
+  model_bic <- step(model, direction = "backward", k=log(len), trace=0)
+  
+  false_negative_aic_sim2[i] <- sum(!(signif %in% names(coef(model_aic))))
+  false_positive_aic_sim2[i] <- sum(names(coef(model_aic)) %in% not_sig)
+  false_negative_bic_sim2[i] <- sum(!(signif %in% names(coef(model_bic))))
+  false_positive_bic_sim2[i] <- sum(names(coef(model_bic)) %in% not_sig)
+}
+
+
+```
+
+```{r}
+method_table <- data.frame(
+                            Method = c("AIC","BIC"),
+                            False_Negative = c(sum(false_negative_aic_sim2)/200,sum(false_negative_bic_sim2/200)),
+                            False_Positive = c(sum(false_positive_aic_sim2)/200,sum(false_positive_bic_sim2/200))
+                          )
+kable(method_table,caption="Model Selection Table")
+```
+
+When using dataset `sim_data_1`, we see that we do not find any false negative  using both `AIC` and `BIC` methods. i.e. methods are not excluding significant variables every time. Also the average of false positive is higher for `AIC` than `BIC`. i.e. `AIC` is choosing non-significant variables more often than `BIC`. `AIC` by definition selects larger model compare to `BIC` and because of large number of $\beta$ parameters, we get more the false positive compare to `BIC`. On the other hand since `BIC` is more restrictive, it tries to exclue variables more often than `AIC` hence we get more false negative i.e. significant variables.
